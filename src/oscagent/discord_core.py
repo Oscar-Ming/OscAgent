@@ -86,7 +86,7 @@ class DiscordCommandHandler:
             "You are OscAgent, a concise research and coding assistant running from "
             "a Discord-first agent runtime."
         )
-        memories = self._memory_store.search(prompt, limit=5)
+        memories = self._memory_store.context_memories(prompt, search_limit=5, recent_limit=3)
         if not memories:
             return base_prompt
 

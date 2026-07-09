@@ -35,6 +35,24 @@ def test_search_returns_relevant_memories(tmp_path: Path) -> None:
     assert [memory.content for memory in results] == ["User applies to AI graduate programs."]
 
 
+def test_search_matches_short_chinese_memory(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+    store.remember("我21岁")
+
+    results = store.search("我几岁")
+
+    assert results[0].content == "我21岁"
+
+
+def test_context_memories_include_recent_memories(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+    memory = store.remember("User prefers concise answers.")
+
+    results = store.context_memories("unrelated query")
+
+    assert results[0].id == memory.id
+
+
 def test_forget_deletes_memory(tmp_path: Path) -> None:
     store = MemoryStore(tmp_path / "memory.db")
     memory = store.remember("Temporary memory.")

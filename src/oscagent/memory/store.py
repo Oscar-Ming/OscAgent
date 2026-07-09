@@ -99,6 +99,26 @@ class MemoryStore:
         scored.sort(key=lambda item: (item[0], item[1].id), reverse=True)
         return [memory for _, memory in scored[:limit]]
 
+    def context_memories(
+        self,
+        query: str,
+        *,
+        search_limit: int = 5,
+        recent_limit: int = 3,
+    ) -> list[MemoryRecord]:
+        searched = self.search(query, limit=search_limit)
+        recent = self.list_memories(limit=recent_limit)
+
+        combined: list[MemoryRecord] = []
+        seen_ids: set[int] = set()
+        for memory in [*searched, *recent]:
+            if memory.id in seen_ids:
+                continue
+            combined.append(memory)
+            seen_ids.add(memory.id)
+
+        return combined
+
     def count(self) -> int:
         self._ensure_schema()
         with self._connect() as connection:
@@ -145,4 +165,10 @@ class MemoryStore:
         )
 
     def _tokens(self, text: str) -> set[str]:
-        return {match.group(0).lower() for match in TOKEN_PATTERN.finditer(text)}
+        tokens: set[str] = set()
+        for match in TOKEN_PATTERN.finditer(text):
+            token = match.group(0).lower()
+            tokens.add(token)
+            tokens.update(re.findall(r"\d+", token))
+            tokens.update(char for char in token if "\u4e00" <= char <= "\u9fff")
+        return tokens

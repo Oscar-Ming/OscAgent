@@ -85,14 +85,20 @@ class MemoryStore:
         self._ensure_schema()
         limit = max(1, min(limit, 20))
         query_tokens = self._tokens(query)
-        if not query_tokens:
+        normalized_query = self._normalize(query)
+        if not query_tokens and not normalized_query:
             return []
 
         memories = self.list_memories(limit=100)
         scored: list[tuple[int, MemoryRecord]] = []
         for memory in memories:
             memory_tokens = self._tokens(memory.content)
+            normalized_memory = self._normalize(memory.content)
             score = len(query_tokens & memory_tokens)
+            if normalized_query and normalized_memory:
+                if normalized_query in normalized_memory or normalized_memory in normalized_query:
+                    score += 8
+                score += len(set(normalized_query) & set(normalized_memory))
             if score:
                 scored.append((score, memory))
 
@@ -103,8 +109,8 @@ class MemoryStore:
         self,
         query: str,
         *,
-        search_limit: int = 5,
-        recent_limit: int = 3,
+        search_limit: int = 10,
+        recent_limit: int = 20,
     ) -> list[MemoryRecord]:
         searched = self.search(query, limit=search_limit)
         recent = self.list_memories(limit=recent_limit)
@@ -172,3 +178,6 @@ class MemoryStore:
             tokens.update(re.findall(r"\d+", token))
             tokens.update(char for char in token if "\u4e00" <= char <= "\u9fff")
         return tokens
+
+    def _normalize(self, text: str) -> str:
+        return "".join(match.group(0).lower() for match in TOKEN_PATTERN.finditer(text))

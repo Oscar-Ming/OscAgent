@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from oscagent.agent import RepoAnalysisAgent, is_repo_analysis_request
@@ -28,6 +29,11 @@ class DiscordCommandHandler:
         cleaned_prompt = prompt.strip()
         if not cleaned_prompt:
             return DiscordResponse("Please include a question after `/ask`.")
+
+        memory_content = self._extract_memory_request(cleaned_prompt)
+        if memory_content:
+            memory = self.remember(memory_content)
+            return DiscordResponse(f"Stored memory {memory.id}: {memory.content}")
 
         if is_repo_analysis_request(cleaned_prompt):
             agent = RepoAnalysisAgent(self._llm_provider, self._settings)
@@ -84,9 +90,11 @@ class DiscordCommandHandler:
     def _build_system_prompt(self, prompt: str) -> str:
         base_prompt = (
             "You are OscAgent, a concise research and coding assistant running from "
-            "a Discord-first agent runtime."
+            "a Discord-first agent runtime. Persistent memory is authoritative for "
+            "questions about the user. If the memory answers the question, answer from "
+            "memory directly instead of saying you do not know."
         )
-        memories = self._memory_store.context_memories(prompt, search_limit=5, recent_limit=3)
+        memories = self._memory_store.context_memories(prompt, search_limit=10, recent_limit=20)
         if not memories:
             return base_prompt
 
@@ -98,3 +106,15 @@ class DiscordCommandHandler:
                 *memory_lines,
             ]
         )
+
+    def _extract_memory_request(self, prompt: str) -> str | None:
+        patterns = (
+            r"^(?:请)?(?:帮我)?记住[:：\s]*(.+)$",
+            r"^(?:please\s+)?remember[:\s]+(.+)$",
+        )
+        for pattern in patterns:
+            match = re.match(pattern, prompt, flags=re.IGNORECASE)
+            if match:
+                content = match.group(1).strip()
+                return content or None
+        return None

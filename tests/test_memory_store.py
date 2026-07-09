@@ -32,7 +32,7 @@ def test_search_returns_relevant_memories(tmp_path: Path) -> None:
 
     results = store.search("write AI graduate project summary")
 
-    assert [memory.content for memory in results] == ["User applies to AI graduate programs."]
+    assert results[0].content == "User applies to AI graduate programs."
 
 
 def test_search_matches_short_chinese_memory(tmp_path: Path) -> None:
@@ -42,6 +42,15 @@ def test_search_matches_short_chinese_memory(tmp_path: Path) -> None:
     results = store.search("我几岁")
 
     assert results[0].content == "我21岁"
+
+
+def test_search_matches_chinese_height_memory(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+    store.remember("我身高6英尺")
+
+    results = store.search("我身高多少")
+
+    assert results[0].content == "我身高6英尺"
 
 
 def test_context_memories_include_recent_memories(tmp_path: Path) -> None:

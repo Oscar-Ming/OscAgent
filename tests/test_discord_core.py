@@ -83,3 +83,12 @@ def test_handle_ask_includes_relevant_memory(tmp_path: Path) -> None:
     assert response.content == "recorded response"
     assert "Relevant persistent memory" in provider.messages[0].content
     assert "concise architecture summaries" in provider.messages[0].content
+
+
+def test_handle_ask_can_store_memory_from_natural_language(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    response = asyncio.run(handler.handle_ask("记住我身高6英尺"))
+
+    assert "Stored memory" in response.content
+    assert handler.search_memories("我身高多少")[0].content == "我身高6英尺"

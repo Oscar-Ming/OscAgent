@@ -161,6 +161,14 @@ Discord:
 Phase 4 adds a SQLite-backed memory store. Memories are stored locally at
 `OSCAGENT_DB_PATH` and are automatically searched before normal `/ask` responses.
 
+The preferred Discord flow is natural language:
+
+```text
+/ask 记住我身高6英尺
+/ask 请忘记我的身高
+/ask 我身高多少
+```
+
 CLI examples:
 
 ```bash
@@ -173,11 +181,13 @@ python -m oscagent memory forget 1
 Discord:
 
 ```text
-/memory action:remember content:User prefers Python and FastAPI.
 /memory action:list
 /memory action:search content:Python
 /memory action:forget content:1
 ```
+
+`/memory` is intended for inspection and manual cleanup. Day-to-day remembering
+and forgetting should go through `/ask` natural language commands.
 
 Memory is used as context for ordinary questions. Repository analysis still runs
 through the read-only tool workflow first.

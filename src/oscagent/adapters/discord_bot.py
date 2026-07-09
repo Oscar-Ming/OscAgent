@@ -56,14 +56,13 @@ async def _run_discord_bot(settings: Settings) -> None:
         response = await handler.handle_status()
         await interaction.response.send_message(response.content[:2000], ephemeral=True)
 
-    @tree.command(name="memory", description="Manage OscAgent persistent memory.")
+    @tree.command(name="memory", description="Inspect or delete OscAgent persistent memory.")
     @app_commands.describe(
         action="Memory action.",
-        content="Content, search query, or memory id depending on the action.",
+        content="Search query or memory id depending on the action.",
     )
     @app_commands.choices(
         action=[
-            app_commands.Choice(name="remember", value="remember"),
             app_commands.Choice(name="list", value="list"),
             app_commands.Choice(name="forget", value="forget"),
             app_commands.Choice(name="search", value="search"),
@@ -74,20 +73,6 @@ async def _run_discord_bot(settings: Settings) -> None:
         action: app_commands.Choice[str],
         content: str = "",
     ) -> None:
-        if action.value == "remember":
-            if not content.strip():
-                await interaction.response.send_message(
-                    "Memory content is required.",
-                    ephemeral=True,
-                )
-                return
-            memory_record = handler.remember(content)
-            await interaction.response.send_message(
-                f"Stored memory {memory_record.id}.",
-                ephemeral=True,
-            )
-            return
-
         if action.value == "list":
             memories = handler.list_memories(limit=10)
             response = _format_memories(memories)
@@ -107,7 +92,7 @@ async def _run_discord_bot(settings: Settings) -> None:
             message = (
                 f"Deleted memory {memory_id}."
                 if deleted
-                else f"Memory {memory_id} not found."
+                else f"Memory {memory_id} not found. You can also use `/ask 请忘记...`."
             )
             await interaction.response.send_message(message, ephemeral=True)
             return

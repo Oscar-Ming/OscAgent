@@ -35,6 +35,16 @@ class DiscordCommandHandler:
             memory = self.remember(memory_content)
             return DiscordResponse(f"Stored memory {memory.id}: {memory.content}")
 
+        forget_query = self._extract_forget_request(cleaned_prompt)
+        if forget_query:
+            deleted = self.forget_memories_matching(forget_query)
+            if not deleted:
+                return DiscordResponse(f"No matching memories found for: {forget_query}")
+            deleted_lines = "\n".join(f"- {memory.content}" for memory in deleted)
+            return DiscordResponse(
+                f"Forgot {len(deleted)} matching memory item(s):\n{deleted_lines}"
+            )
+
         if is_repo_analysis_request(cleaned_prompt):
             agent = RepoAnalysisAgent(self._llm_provider, self._settings)
             answer, trace = await agent.analyze(cleaned_prompt)
@@ -71,6 +81,9 @@ class DiscordCommandHandler:
 
     def forget_memory(self, memory_id: int) -> bool:
         return self._memory_store.forget(memory_id)
+
+    def forget_memories_matching(self, query: str, *, limit: int = 10) -> list[MemoryRecord]:
+        return self._memory_store.forget_matching(query, limit=limit)
 
     async def handle_status(self) -> DiscordResponse:
         return DiscordResponse(
@@ -109,8 +122,22 @@ class DiscordCommandHandler:
 
     def _extract_memory_request(self, prompt: str) -> str | None:
         patterns = (
-            r"^(?:请)?(?:帮我)?记住[:：\s]*(.+)$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u8bb0\u4f4f[:\uff1a\s]*(.+)$",
             r"^(?:please\s+)?remember[:\s]+(.+)$",
+        )
+        for pattern in patterns:
+            match = re.match(pattern, prompt, flags=re.IGNORECASE)
+            if match:
+                content = match.group(1).strip()
+                return content or None
+        return None
+
+    def _extract_forget_request(self, prompt: str) -> str | None:
+        patterns = (
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u5fd8\u8bb0[:\uff1a\s]*(.+)$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u5220\u9664(?:\u8bb0\u5fc6)?[:\uff1a\s]*(.+)$",
+            r"^(?:please\s+)?forget[:\s]+(.+)$",
+            r"^(?:please\s+)?delete\s+(?:the\s+)?memory\s+(?:about\s+)?(.+)$",
         )
         for pattern in patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)

@@ -81,6 +81,25 @@ class MemoryStore:
             cursor = connection.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
             return cursor.rowcount > 0
 
+    def forget_matching(self, query: str, *, limit: int = 10) -> list[MemoryRecord]:
+        scored_matches = self._scored_memories(query)
+        if not scored_matches:
+            return []
+
+        highest_score = scored_matches[0][0]
+        if highest_score < 2:
+            return []
+
+        matches = [memory for score, memory in scored_matches[:limit] if score == highest_score]
+        deleted: list[MemoryRecord] = []
+        with self._connect() as connection:
+            for memory in matches:
+                cursor = connection.execute("DELETE FROM memories WHERE id = ?", (memory.id,))
+                if cursor.rowcount:
+                    deleted.append(memory)
+
+        return deleted
+
     def search(self, query: str, *, limit: int = 5) -> list[MemoryRecord]:
         self._ensure_schema()
         limit = max(1, min(limit, 20))
@@ -90,17 +109,11 @@ class MemoryStore:
             return []
 
         memories = self.list_memories(limit=100)
-        scored: list[tuple[int, MemoryRecord]] = []
-        for memory in memories:
-            memory_tokens = self._tokens(memory.content)
-            normalized_memory = self._normalize(memory.content)
-            score = len(query_tokens & memory_tokens)
-            if normalized_query and normalized_memory:
-                if normalized_query in normalized_memory or normalized_memory in normalized_query:
-                    score += 8
-                score += len(set(normalized_query) & set(normalized_memory))
-            if score:
-                scored.append((score, memory))
+        scored = [
+            (self._score(query_tokens, normalized_query, memory), memory)
+            for memory in memories
+        ]
+        scored = [(score, memory) for score, memory in scored if score]
 
         scored.sort(key=lambda item: (item[0], item[1].id), reverse=True)
         return [memory for _, memory in scored[:limit]]
@@ -181,3 +194,32 @@ class MemoryStore:
 
     def _normalize(self, text: str) -> str:
         return "".join(match.group(0).lower() for match in TOKEN_PATTERN.finditer(text))
+
+    def _scored_memories(self, query: str) -> list[tuple[int, MemoryRecord]]:
+        query_tokens = self._tokens(query)
+        normalized_query = self._normalize(query)
+        if not query_tokens and not normalized_query:
+            return []
+
+        scored = [
+            (self._score(query_tokens, normalized_query, memory), memory)
+            for memory in self.list_memories(limit=100)
+        ]
+        scored = [(score, memory) for score, memory in scored if score]
+        scored.sort(key=lambda item: (item[0], item[1].id), reverse=True)
+        return scored
+
+    def _score(
+        self,
+        query_tokens: set[str],
+        normalized_query: str,
+        memory: MemoryRecord,
+    ) -> int:
+        memory_tokens = self._tokens(memory.content)
+        normalized_memory = self._normalize(memory.content)
+        score = len(query_tokens & memory_tokens)
+        if normalized_query and normalized_memory:
+            if normalized_query in normalized_memory or normalized_memory in normalized_query:
+                score += 8
+            score += len(set(normalized_query) & set(normalized_memory))
+        return score

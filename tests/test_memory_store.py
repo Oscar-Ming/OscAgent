@@ -69,3 +69,16 @@ def test_forget_deletes_memory(tmp_path: Path) -> None:
     assert store.forget(memory.id)
     assert store.count() == 0
     assert not store.forget(memory.id)
+
+
+def test_forget_matching_deletes_relevant_memory(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+    height = store.remember("\u6211\u8eab\u9ad86\u82f1\u5c3a")
+    color = store.remember("\u6211\u559c\u6b22\u84dd\u8272")
+
+    deleted = store.forget_matching("\u6211\u7684\u8eab\u9ad8")
+
+    assert [memory.id for memory in deleted] == [height.id]
+    remaining = store.list_memories()
+    assert height.id not in {memory.id for memory in remaining}
+    assert color.id in {memory.id for memory in remaining}

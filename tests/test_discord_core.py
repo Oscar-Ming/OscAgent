@@ -88,7 +88,23 @@ def test_handle_ask_includes_relevant_memory(tmp_path: Path) -> None:
 def test_handle_ask_can_store_memory_from_natural_language(tmp_path: Path) -> None:
     handler, _ = build_memory_handler(tmp_path)
 
-    response = asyncio.run(handler.handle_ask("记住我身高6英尺"))
+    response = asyncio.run(handler.handle_ask("\u8bb0\u4f4f\u6211\u8eab\u9ad86\u82f1\u5c3a"))
 
     assert "Stored memory" in response.content
-    assert handler.search_memories("我身高多少")[0].content == "我身高6英尺"
+    assert (
+        handler.search_memories("\u6211\u8eab\u9ad8\u591a\u5c11")[0].content
+        == "\u6211\u8eab\u9ad86\u82f1\u5c3a"
+    )
+
+
+def test_handle_ask_can_forget_memory_from_natural_language(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    handler.remember("\u6211\u8eab\u9ad86\u82f1\u5c3a")
+    handler.remember("\u6211\u559c\u6b22\u84dd\u8272")
+
+    response = asyncio.run(handler.handle_ask("\u8bf7\u5fd8\u8bb0\u6211\u7684\u8eab\u9ad8"))
+
+    assert "Forgot 1" in response.content
+    remaining = [memory.content for memory in handler.list_memories()]
+    assert "\u6211\u8eab\u9ad86\u82f1\u5c3a" not in remaining
+    assert "\u6211\u559c\u6b22\u84dd\u8272" in remaining

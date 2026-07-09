@@ -21,7 +21,8 @@
 - Add a provider-agnostic chat interface.
 - Support OpenAI.
 - Support DeepSeek through an OpenAI-compatible endpoint.
-- Add model selection through config and Discord commands.
+- Add model selection through config.
+- Add local terminal testing with `oscagent ask`.
 
 ## Phase 3: Agent Core and Tools
 

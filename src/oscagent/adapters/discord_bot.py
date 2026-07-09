@@ -5,7 +5,7 @@ import socket
 
 from oscagent.config import Settings
 from oscagent.discord_core import DiscordCommandHandler
-from oscagent.llm import MockLLMProvider
+from oscagent.llm import LLMRouter
 
 
 def run_discord_bot(settings: Settings | None = None) -> None:
@@ -34,7 +34,7 @@ async def _run_discord_bot(settings: Settings) -> None:
         proxy=settings.discord_proxy,
     )
     tree = app_commands.CommandTree(client)
-    handler = DiscordCommandHandler(MockLLMProvider(), settings)
+    handler = DiscordCommandHandler(LLMRouter(settings), settings)
 
     @client.event
     async def on_ready() -> None:

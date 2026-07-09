@@ -52,6 +52,12 @@ python -m oscagent doctor
 
 Copy `.env.example` to `.env` and fill in API keys when you are ready to connect Discord and model providers.
 
+You can test the local LLM path without Discord:
+
+```bash
+python -m oscagent ask "hello from OscAgent"
+```
+
 ## Discord MVP
 
 Phase 1 adds a Discord adapter with two slash commands:
@@ -84,6 +90,44 @@ python -m oscagent discord
 
 `DISCORD_GUILD_ID` is optional, but setting it during development makes slash command syncing faster for one test server.
 `DISCORD_PROXY` is optional. Set it only if Python cannot connect to Discord directly and your system uses a local proxy.
+
+## LLM Providers
+
+`OSCAGENT_MODEL` uses this format:
+
+```text
+provider:model
+```
+
+Supported providers:
+
+| Provider | Example | Required environment variables |
+| --- | --- | --- |
+| Mock | `mock:local` | None |
+| OpenAI | `openai:gpt-4.1-mini` | `OPENAI_API_KEY` |
+| DeepSeek | `deepseek:deepseek-chat` | `DEEPSEEK_API_KEY` |
+
+Example OpenAI config:
+
+```env
+OSCAGENT_MODEL=openai:gpt-4.1-mini
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+Example DeepSeek config:
+
+```env
+OSCAGENT_MODEL=deepseek:deepseek-chat
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
+If your network requires a proxy for model API calls:
+
+```env
+LLM_PROXY=http://127.0.0.1:7897
+```
 
 ## Roadmap
 

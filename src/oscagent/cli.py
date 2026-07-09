@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 
 from oscagent import __version__
 from oscagent.adapters.discord_bot import run_discord_bot
 from oscagent.config import Settings
+from oscagent.discord_core import DiscordCommandHandler
+from oscagent.llm import LLMRouter
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,7 +25,19 @@ def build_parser() -> argparse.ArgumentParser:
     discord = subcommands.add_parser("discord", help="Run the Discord bot adapter.")
     discord.set_defaults(func=run_discord)
 
+    ask = subcommands.add_parser("ask", help="Ask OscAgent from the local terminal.")
+    ask.add_argument("prompt", nargs="+", help="Question or task for OscAgent.")
+    ask.set_defaults(func=run_ask)
+
     return parser
+
+
+def run_ask(args: argparse.Namespace) -> int:
+    settings = Settings()
+    handler = DiscordCommandHandler(LLMRouter(settings), settings)
+    response = asyncio.run(handler.handle_ask(" ".join(args.prompt)))
+    print(response.content)
+    return 0
 
 
 def run_discord(_: argparse.Namespace) -> int:

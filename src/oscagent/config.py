@@ -18,5 +18,6 @@ class Settings(BaseSettings):
 
     discord_bot_token: str | None = Field(default=None, alias="DISCORD_BOT_TOKEN")
     discord_guild_id: str | None = Field(default=None, alias="DISCORD_GUILD_ID")
+    discord_proxy: str | None = Field(default=None, alias="DISCORD_PROXY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     deepseek_api_key: str | None = Field(default=None, alias="DEEPSEEK_API_KEY")

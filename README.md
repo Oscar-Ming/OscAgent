@@ -72,6 +72,7 @@ Create a `.env` file:
 ```bash
 DISCORD_BOT_TOKEN=your_discord_bot_token
 DISCORD_GUILD_ID=your_test_server_id
+DISCORD_PROXY=http://127.0.0.1:7897
 OSCAGENT_MODEL=mock:local
 ```
 
@@ -82,6 +83,7 @@ python -m oscagent discord
 ```
 
 `DISCORD_GUILD_ID` is optional, but setting it during development makes slash command syncing faster for one test server.
+`DISCORD_PROXY` is optional. Set it only if Python cannot connect to Discord directly and your system uses a local proxy.
 
 ## Roadmap
 

@@ -37,6 +37,7 @@ def run_doctor(_: argparse.Namespace) -> int:
     print(f"- default model: {settings.model}")
     print(f"- database path: {settings.db_path}")
     print(f"- discord token configured: {settings.discord_bot_token is not None}")
+    print(f"- discord proxy configured: {settings.discord_proxy is not None}")
     print(f"- OpenAI key configured: {settings.openai_api_key is not None}")
     print(f"- DeepSeek key configured: {settings.deepseek_api_key is not None}")
     return 0

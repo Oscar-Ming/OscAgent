@@ -156,6 +156,32 @@ Discord:
 /ask analyze repo
 ```
 
+## Persistent Memory
+
+Phase 4 adds a SQLite-backed memory store. Memories are stored locally at
+`OSCAGENT_DB_PATH` and are automatically searched before normal `/ask` responses.
+
+CLI examples:
+
+```bash
+python -m oscagent memory remember "User prefers concise architecture summaries."
+python -m oscagent memory list
+python -m oscagent memory search "architecture summaries"
+python -m oscagent memory forget 1
+```
+
+Discord:
+
+```text
+/memory action:remember content:User prefers Python and FastAPI.
+/memory action:list
+/memory action:search content:Python
+/memory action:forget content:1
+```
+
+Memory is used as context for ordinary questions. Repository analysis still runs
+through the read-only tool workflow first.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

@@ -35,9 +35,10 @@
 ## Phase 4: Persistent Memory
 
 - Add SQLite storage.
-- Store conversation summaries and user preferences.
-- Add memory retrieval before agent execution.
-- Add commands to inspect and delete memory.
+- Store user/project memories through CLI and Discord.
+- Add memory retrieval before ordinary `/ask` responses.
+- Add commands to inspect, search, and delete memory.
+- Keep memory local through `OSCAGENT_DB_PATH`.
 
 ## Phase 5: Portfolio Polish
 

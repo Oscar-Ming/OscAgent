@@ -58,4 +58,77 @@ async def _run_discord_bot(settings: Settings) -> None:
         response = await handler.handle_status()
         await interaction.response.send_message(response.content[:2000], ephemeral=True)
 
+    @tree.command(name="memory", description="Manage OscAgent persistent memory.")
+    @app_commands.describe(
+        action="Memory action.",
+        content="Content, search query, or memory id depending on the action.",
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="remember", value="remember"),
+            app_commands.Choice(name="list", value="list"),
+            app_commands.Choice(name="forget", value="forget"),
+            app_commands.Choice(name="search", value="search"),
+        ]
+    )
+    async def memory(
+        interaction: discord.Interaction,
+        action: app_commands.Choice[str],
+        content: str = "",
+    ) -> None:
+        if action.value == "remember":
+            if not content.strip():
+                await interaction.response.send_message(
+                    "Memory content is required.",
+                    ephemeral=True,
+                )
+                return
+            memory_record = handler.remember(content)
+            await interaction.response.send_message(
+                f"Stored memory {memory_record.id}.",
+                ephemeral=True,
+            )
+            return
+
+        if action.value == "list":
+            memories = handler.list_memories(limit=10)
+            response = _format_memories(memories)
+            await interaction.response.send_message(response[:2000], ephemeral=True)
+            return
+
+        if action.value == "forget":
+            try:
+                memory_id = int(content.strip())
+            except ValueError:
+                await interaction.response.send_message(
+                    "Please provide a numeric memory id.",
+                    ephemeral=True,
+                )
+                return
+            deleted = handler.forget_memory(memory_id)
+            message = (
+                f"Deleted memory {memory_id}."
+                if deleted
+                else f"Memory {memory_id} not found."
+            )
+            await interaction.response.send_message(message, ephemeral=True)
+            return
+
+        if action.value == "search":
+            if not content.strip():
+                await interaction.response.send_message("Search query is required.", ephemeral=True)
+                return
+            memories = handler.search_memories(content, limit=10)
+            response = _format_memories(memories)
+            await interaction.response.send_message(response[:2000], ephemeral=True)
+            return
+
     await client.start(settings.discord_bot_token)
+
+
+def _format_memories(memories: object) -> str:
+    memory_records = list(memories)
+    if not memory_records:
+        return "No memories found."
+
+    return "\n".join(f"{memory.id}. [{memory.scope}] {memory.content}" for memory in memory_records)

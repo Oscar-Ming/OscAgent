@@ -15,9 +15,9 @@ def build_handler() -> DiscordCommandHandler:
 def test_handle_ask_returns_mock_response() -> None:
     handler = build_handler()
 
-    response = asyncio.run(handler.handle_ask("Summarize this repo"))
+    response = asyncio.run(handler.handle_ask("hello"))
 
-    assert response.content == "[mock:mock:test-model] Summarize this repo"
+    assert response.content == "[mock:mock:test-model] hello"
 
 
 def test_handle_ask_rejects_empty_prompt() -> None:
@@ -35,3 +35,12 @@ def test_handle_status_reports_model() -> None:
 
     assert "OscAgent status" in response.content
     assert "- model: mock:test-model" in response.content
+
+
+def test_handle_ask_routes_repo_analysis() -> None:
+    handler = build_handler()
+
+    response = asyncio.run(handler.handle_ask("analyze repo"))
+
+    assert "Tool trace:" in response.content
+    assert "`list_files`" in response.content

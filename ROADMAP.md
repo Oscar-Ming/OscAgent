@@ -26,10 +26,11 @@
 
 ## Phase 3: Agent Core and Tools
 
-- Implement a small planning/execution loop.
-- Add file tools: list files, read file, search text.
-- Add safe command execution with permission checks.
+- Implement a controlled repository analysis workflow.
+- Add read-only tools: list files, read file, search text, git status.
+- Add workspace path sandboxing for file tools.
 - Add task trace logs.
+- Route repo-analysis prompts from Discord to the agent workflow.
 
 ## Phase 4: Persistent Memory
 

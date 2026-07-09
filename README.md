@@ -129,6 +129,33 @@ If your network requires a proxy for model API calls:
 LLM_PROXY=http://127.0.0.1:7897
 ```
 
+## Read-only Agent Tools
+
+Phase 3 adds a controlled repository analysis workflow. If a prompt asks to analyze
+the repo or project structure, OscAgent runs a small read-only tool plan before
+asking the model to summarize the result.
+
+Initial tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `list_files` | List workspace files with ignored build/cache/log folders filtered out. |
+| `read_file` | Read selected text files inside the workspace. |
+| `search_text` | Search workspace text files for literal matches. |
+| `git_status` | Show branch and working tree state. |
+
+Example:
+
+```bash
+python -m oscagent ask "analyze repo"
+```
+
+Discord:
+
+```text
+/ask analyze repo
+```
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

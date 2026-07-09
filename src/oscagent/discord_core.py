@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from oscagent.agent import RepoAnalysisAgent, is_repo_analysis_request
 from oscagent.config import Settings
 from oscagent.llm import ChatMessage, LLMProvider
 
@@ -20,6 +21,15 @@ class DiscordCommandHandler:
         cleaned_prompt = prompt.strip()
         if not cleaned_prompt:
             return DiscordResponse("Please include a question after `/ask`.")
+
+        if is_repo_analysis_request(cleaned_prompt):
+            agent = RepoAnalysisAgent(self._llm_provider, self._settings)
+            answer, trace = await agent.analyze(cleaned_prompt)
+            trace_text = f"Tool trace:\n{trace.to_markdown()}"
+            max_answer_length = 1900 - len(trace_text)
+            if len(answer) > max_answer_length:
+                answer = answer[:max_answer_length].rstrip() + "\n...[truncated]"
+            return DiscordResponse(f"{answer}\n\n{trace_text}")
 
         messages = [
             ChatMessage(

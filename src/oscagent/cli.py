@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 
 from oscagent import __version__
 from oscagent.adapters.discord_bot import run_discord_bot
@@ -36,6 +37,8 @@ def run_ask(args: argparse.Namespace) -> int:
     settings = Settings()
     handler = DiscordCommandHandler(LLMRouter(settings), settings)
     response = asyncio.run(handler.handle_ask(" ".join(args.prompt)))
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     print(response.content)
     return 0
 

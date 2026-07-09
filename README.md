@@ -52,6 +52,37 @@ python -m oscagent doctor
 
 Copy `.env.example` to `.env` and fill in API keys when you are ready to connect Discord and model providers.
 
+## Discord MVP
+
+Phase 1 adds a Discord adapter with two slash commands:
+
+| Command | Purpose |
+| --- | --- |
+| `/ask` | Send a question to OscAgent. The current implementation uses a mock LLM provider. |
+| `/status` | Show runtime configuration status. |
+
+Install Discord support:
+
+```bash
+python -m pip install -e ".[dev,discord]"
+```
+
+Create a `.env` file:
+
+```bash
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_GUILD_ID=your_test_server_id
+OSCAGENT_MODEL=mock:local
+```
+
+Run the bot:
+
+```bash
+python -m oscagent discord
+```
+
+`DISCORD_GUILD_ID` is optional, but setting it during development makes slash command syncing faster for one test server.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

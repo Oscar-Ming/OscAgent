@@ -12,8 +12,9 @@
 
 - Create Discord bot adapter.
 - Support `/ask` for simple model-backed conversation.
+- Support `/status` for runtime checks.
 - Add local development instructions for Discord bot tokens.
-- Add tests around message normalization.
+- Add tests around Discord command handling.
 
 ## Phase 2: LLM Provider Layer
 

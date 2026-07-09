@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from oscagent import __version__
+from oscagent.adapters.discord_bot import run_discord_bot
 from oscagent.config import Settings
 
 
@@ -18,7 +19,15 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subcommands.add_parser("doctor", help="Check local OscAgent configuration.")
     doctor.set_defaults(func=run_doctor)
 
+    discord = subcommands.add_parser("discord", help="Run the Discord bot adapter.")
+    discord.set_defaults(func=run_discord)
+
     return parser
+
+
+def run_discord(_: argparse.Namespace) -> int:
+    run_discord_bot()
+    return 0
 
 
 def run_doctor(_: argparse.Namespace) -> int:

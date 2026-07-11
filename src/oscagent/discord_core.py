@@ -58,10 +58,14 @@ class DiscordCommandHandler:
         confirm_action_id = self._extract_confirm_action_id(cleaned_prompt)
         if confirm_action_id is not None:
             return DiscordResponse(self._execute_pending_action(confirm_action_id))
+        if self._is_implicit_confirm_action(cleaned_prompt):
+            return DiscordResponse(self._execute_implicit_pending_action())
 
         cancel_action_id = self._extract_cancel_action_id(cleaned_prompt)
         if cancel_action_id is not None:
             return DiscordResponse(self._cancel_pending_action(cancel_action_id))
+        if self._is_implicit_cancel_action(cleaned_prompt):
+            return DiscordResponse(self._cancel_implicit_pending_action())
 
         if self._is_memory_list_request(cleaned_prompt):
             return DiscordResponse(self._format_memories(self.list_memories(limit=20)))
@@ -240,6 +244,21 @@ class DiscordCommandHandler:
         )
         return self._extract_action_id(prompt, patterns)
 
+    def _is_implicit_confirm_action(self, prompt: str) -> bool:
+        patterns = (
+            r"^\u786e\u8ba4\u6267\u884c$",
+            r"^confirm$",
+            r"^confirm\s+execute$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _is_implicit_cancel_action(self, prompt: str) -> bool:
+        patterns = (
+            r"^\u53d6\u6d88$",
+            r"^cancel$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
     def _extract_action_id(self, prompt: str, patterns: tuple[str, ...]) -> int | None:
         for pattern in patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)
@@ -340,6 +359,12 @@ class DiscordCommandHandler:
         self._action_store.mark_status(action_id, "executed")
         return "\n".join([f"Executed pa_{action_id}:", *results])
 
+    def _execute_implicit_pending_action(self) -> str:
+        action = self._single_pending_action()
+        if isinstance(action, str):
+            return action
+        return self._execute_pending_action(action.id)
+
     def _cancel_pending_action(self, action_id: int) -> str:
         action = self._action_store.get(action_id)
         if not action:
@@ -348,6 +373,25 @@ class DiscordCommandHandler:
             return f"Pending action pa_{action_id} is already {action.status}."
         self._action_store.mark_status(action_id, "cancelled")
         return f"Cancelled pa_{action_id}."
+
+    def _cancel_implicit_pending_action(self) -> str:
+        action = self._single_pending_action()
+        if isinstance(action, str):
+            return action
+        return self._cancel_pending_action(action.id)
+
+    def _single_pending_action(self) -> PendingAction | str:
+        actions = self._action_store.list_pending()
+        if not actions:
+            return "No pending actions."
+        if len(actions) > 1:
+            return "\n".join(
+                [
+                    "Multiple pending actions exist. Please specify one:",
+                    self._format_pending_actions(actions),
+                ]
+            )
+        return actions[0]
 
     def _format_pending_action(self, action: PendingAction) -> str:
         operation_lines = [
@@ -360,8 +404,9 @@ class DiscordCommandHandler:
                 "This will modify workspace files.",
                 "Operations:",
                 *operation_lines,
-                f"Confirm: /ask \u786e\u8ba4\u6267\u884c pa_{action.id}",
-                f"Cancel: /ask \u53d6\u6d88 pa_{action.id}",
+                "Confirm: /ask \u786e\u8ba4\u6267\u884c",
+                "Cancel: /ask \u53d6\u6d88",
+                f"Precise confirm: /ask \u786e\u8ba4\u6267\u884c pa_{action.id}",
             ]
         )
 

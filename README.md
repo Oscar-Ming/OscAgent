@@ -218,9 +218,12 @@ OscAgent responds with a pending action:
 
 ```text
 Pending action pa_1: Create directory `docs`
-Confirm: /ask 确认执行 pa_1
-Cancel: /ask 取消 pa_1
+Confirm: /ask 确认执行
+Cancel: /ask 取消
 ```
+
+If multiple pending actions exist, OscAgent will ask you to specify the action id,
+for example `/ask 确认执行 pa_2`.
 
 This phase intentionally does not support deleting files or running arbitrary shell commands.
 

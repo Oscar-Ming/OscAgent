@@ -155,7 +155,7 @@ def test_handle_ask_creates_directory_only_after_confirmation(tmp_path: Path) ->
     assert "Pending action pa_1" in pending.content
     assert not (tmp_path / "docs").exists()
 
-    executed = asyncio.run(handler.handle_ask("confirm pa_1"))
+    executed = asyncio.run(handler.handle_ask("confirm"))
 
     assert "Executed pa_1" in executed.content
     assert (tmp_path / "docs").is_dir()
@@ -215,6 +215,30 @@ def test_handle_ask_writes_file_from_natural_language_after_confirmation(
 
     assert "Executed pa_1" in executed.content
     assert (tmp_path / "scratch" / "test.txt").read_text(encoding="utf-8") == "hello"
+
+
+def test_handle_ask_rejects_implicit_confirm_when_multiple_actions_exist(
+    tmp_path: Path,
+) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    asyncio.run(handler.handle_ask("create folder docs"))
+    asyncio.run(handler.handle_ask("create folder notes"))
+
+    response = asyncio.run(handler.handle_ask("confirm"))
+
+    assert "Multiple pending actions exist" in response.content
+    assert not (tmp_path / "docs").exists()
+    assert not (tmp_path / "notes").exists()
+
+
+def test_handle_ask_can_cancel_single_pending_action_implicitly(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    asyncio.run(handler.handle_ask("create folder docs"))
+
+    response = asyncio.run(handler.handle_ask("cancel"))
+
+    assert "Cancelled pa_1" in response.content
+    assert not (tmp_path / "docs").exists()
 
 
 def test_handle_ask_writes_file_from_chinese_natural_language(tmp_path: Path) -> None:

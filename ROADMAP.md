@@ -40,7 +40,37 @@
 - Add commands to inspect, search, and delete memory.
 - Keep memory local through `OSCAGENT_DB_PATH`.
 
-## Phase 5: Portfolio Polish
+## Phase 4.1: Memory UX Hardening
+
+- Route natural-language remember, forget, list, and clear-all requests through `/ask`.
+- Keep `/memory` focused on inspection and manual cleanup.
+- Require confirmation before clearing all memories.
+- Harden Chinese/English memory matching tests.
+
+## Phase 5: Permission Guard and File Operations
+
+- Add permission levels for read-only, workspace write, file move, and dangerous actions.
+- Add confirmation flow for write and move operations.
+- Add safe file tools such as create directory, write file, copy file, and move file.
+- Keep all file operations inside approved workspace roots.
+
+## Phase 6: Planner Agent Loop
+
+- Add a bounded multi-step planner that can choose from registered tools.
+- Enforce maximum step counts and trace logging.
+- Route risky actions into pending confirmation instead of executing immediately.
+
+## Phase 7: Safe Shell and Git Tools
+
+- Add allowlisted shell commands such as tests, lint, and Git inspection.
+- Add Git workflow helpers with confirmation for commit and push.
+
+## Phase 8: Browser Automation
+
+- Add Playwright-backed browser open, search, and page summarization tools.
+- Keep browser automation traceable and bounded.
+
+## Phase 9: Portfolio Polish
 
 - Add architecture diagram.
 - Add demo scripts and screenshots.

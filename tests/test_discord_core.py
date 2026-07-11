@@ -108,3 +108,29 @@ def test_handle_ask_can_forget_memory_from_natural_language(tmp_path: Path) -> N
     remaining = [memory.content for memory in handler.list_memories()]
     assert "\u6211\u8eab\u9ad86\u82f1\u5c3a" not in remaining
     assert "\u6211\u559c\u6b22\u84dd\u8272" in remaining
+
+
+def test_handle_ask_can_list_memories_from_natural_language(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    handler.remember("\u6211\u559c\u6b22\u84dd\u8272")
+
+    response = asyncio.run(handler.handle_ask("\u4f60\u8bb0\u5f97\u4ec0\u4e48"))
+
+    assert "Stored memories:" in response.content
+    assert "\u6211\u559c\u6b22\u84dd\u8272" in response.content
+
+
+def test_handle_ask_requires_confirmation_before_clear_all_memories(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    handler.remember("\u6211\u559c\u6b22\u84dd\u8272")
+    handler.remember("\u621121\u5c81")
+
+    warning = asyncio.run(handler.handle_ask("\u5220\u9664\u6240\u6709\u8bb0\u5fc6"))
+
+    assert "To confirm" in warning.content
+    assert handler.list_memories()
+
+    confirmed = asyncio.run(handler.handle_ask("\u786e\u8ba4\u5220\u9664\u6240\u6709\u8bb0\u5fc6"))
+
+    assert "Cleared 2" in confirmed.content
+    assert not handler.list_memories()

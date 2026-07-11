@@ -100,6 +100,16 @@ class MemoryStore:
 
         return deleted
 
+    def clear_all(self) -> list[MemoryRecord]:
+        memories = self.list_memories(limit=100)
+        if not memories:
+            return []
+
+        with self._connect() as connection:
+            connection.execute("DELETE FROM memories")
+
+        return memories
+
     def search(self, query: str, *, limit: int = 5) -> list[MemoryRecord]:
         self._ensure_schema()
         limit = max(1, min(limit, 20))

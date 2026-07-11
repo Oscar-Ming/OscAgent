@@ -37,20 +37,20 @@ def test_search_returns_relevant_memories(tmp_path: Path) -> None:
 
 def test_search_matches_short_chinese_memory(tmp_path: Path) -> None:
     store = MemoryStore(tmp_path / "memory.db")
-    store.remember("我21岁")
+    store.remember("\u621121\u5c81")
 
-    results = store.search("我几岁")
+    results = store.search("\u6211\u51e0\u5c81")
 
-    assert results[0].content == "我21岁"
+    assert results[0].content == "\u621121\u5c81"
 
 
 def test_search_matches_chinese_height_memory(tmp_path: Path) -> None:
     store = MemoryStore(tmp_path / "memory.db")
-    store.remember("我身高6英尺")
+    store.remember("\u6211\u8eab\u9ad86\u82f1\u5c3a")
 
-    results = store.search("我身高多少")
+    results = store.search("\u6211\u8eab\u9ad8\u591a\u5c11")
 
-    assert results[0].content == "我身高6英尺"
+    assert results[0].content == "\u6211\u8eab\u9ad86\u82f1\u5c3a"
 
 
 def test_context_memories_include_recent_memories(tmp_path: Path) -> None:
@@ -82,3 +82,14 @@ def test_forget_matching_deletes_relevant_memory(tmp_path: Path) -> None:
     remaining = store.list_memories()
     assert height.id not in {memory.id for memory in remaining}
     assert color.id in {memory.id for memory in remaining}
+
+
+def test_clear_all_deletes_all_memories(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.db")
+    first = store.remember("First memory.")
+    second = store.remember("Second memory.")
+
+    deleted = store.clear_all()
+
+    assert {memory.id for memory in deleted} == {first.id, second.id}
+    assert store.count() == 0

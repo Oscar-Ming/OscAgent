@@ -24,11 +24,32 @@ class DiscordCommandHandler:
         self._llm_provider = llm_provider
         self._settings = settings or Settings()
         self._memory_store = memory_store or MemoryStore(self._settings.db_path)
+        self._clear_all_pending = False
 
     async def handle_ask(self, prompt: str) -> DiscordResponse:
         cleaned_prompt = prompt.strip()
         if not cleaned_prompt:
             return DiscordResponse("Please include a question after `/ask`.")
+
+        if self._is_clear_all_confirmation(cleaned_prompt):
+            if not self._clear_all_pending:
+                return DiscordResponse("No memory clear operation is waiting for confirmation.")
+            deleted = self.clear_all_memories()
+            self._clear_all_pending = False
+            return DiscordResponse(f"Cleared {len(deleted)} memory item(s).")
+
+        if self._is_memory_list_request(cleaned_prompt):
+            return DiscordResponse(self._format_memories(self.list_memories(limit=20)))
+
+        if self._is_clear_all_request(cleaned_prompt):
+            memory_count = self._memory_store.count()
+            if memory_count == 0:
+                return DiscordResponse("No memories stored.")
+            self._clear_all_pending = True
+            return DiscordResponse(
+                f"This will delete all {memory_count} memory item(s). "
+                "To confirm, send `/ask 确认删除所有记忆`."
+            )
 
         memory_content = self._extract_memory_request(cleaned_prompt)
         if memory_content:
@@ -84,6 +105,9 @@ class DiscordCommandHandler:
 
     def forget_memories_matching(self, query: str, *, limit: int = 10) -> list[MemoryRecord]:
         return self._memory_store.forget_matching(query, limit=limit)
+
+    def clear_all_memories(self) -> list[MemoryRecord]:
+        return self._memory_store.clear_all()
 
     async def handle_status(self) -> DiscordResponse:
         return DiscordResponse(
@@ -145,3 +169,36 @@ class DiscordCommandHandler:
                 content = match.group(1).strip()
                 return content or None
         return None
+
+    def _is_memory_list_request(self, prompt: str) -> bool:
+        patterns = (
+            r"^(?:\u6211|\u4f60)?\u8bb0\u5f97\u4ec0\u4e48[?？]?$",
+            r"^\u5217\u51fa(?:\u6240\u6709)?\u8bb0\u5fc6$",
+            r"^\u67e5\u770b(?:\u6240\u6709)?\u8bb0\u5fc6$",
+            r"^(?:list|show)\s+(?:all\s+)?memories$",
+            r"^what\s+do\s+you\s+remember\??$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _is_clear_all_request(self, prompt: str) -> bool:
+        patterns = (
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?(?:\u5220\u9664|\u6e05\u7a7a)\u6240\u6709\u8bb0\u5fc6$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?(?:\u5220\u9664|\u6e05\u7a7a)\u5168\u90e8\u8bb0\u5fc6$",
+            r"^(?:clear|delete|forget)\s+(?:all\s+)?(?:memories|memory|everything)$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _is_clear_all_confirmation(self, prompt: str) -> bool:
+        patterns = (
+            r"^\u786e\u8ba4(?:\u5220\u9664|\u6e05\u7a7a)(?:\u6240\u6709|\u5168\u90e8)\u8bb0\u5fc6$",
+            r"^confirm\s+(?:clear|delete|forget)\s+(?:all\s+)?(?:memories|memory)$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _format_memories(self, memories: list[MemoryRecord]) -> str:
+        if not memories:
+            return "No memories stored."
+
+        lines = ["Stored memories:"]
+        lines.extend(f"{memory.id}. [{memory.scope}] {memory.content}" for memory in memories)
+        return "\n".join(lines)

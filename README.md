@@ -166,6 +166,9 @@ The preferred Discord flow is natural language:
 ```text
 /ask 记住我身高6英尺
 /ask 请忘记我的身高
+/ask 你记得什么
+/ask 删除所有记忆
+/ask 确认删除所有记忆
 /ask 我身高多少
 ```
 
@@ -188,6 +191,7 @@ Discord:
 
 `/memory` is intended for inspection and manual cleanup. Day-to-day remembering
 and forgetting should go through `/ask` natural language commands.
+Clearing all memories requires a confirmation phrase to prevent accidental data loss.
 
 Memory is used as context for ordinary questions. Repository analysis still runs
 through the read-only tool workflow first.

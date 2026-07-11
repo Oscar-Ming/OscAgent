@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from oscagent.memory.models import MemoryRecord
@@ -179,10 +181,15 @@ class MemoryStore:
             )
         self._initialized = True
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self._db_path)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _record_from_row(self, row: sqlite3.Row) -> MemoryRecord:
         return MemoryRecord(

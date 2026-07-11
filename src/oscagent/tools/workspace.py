@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -177,4 +178,155 @@ class SearchTextTool:
             tool_name=self.definition.name,
             content="\n".join(matches) if matches else "(no matches)",
             metadata={"query": query, "path": requested_path, "max_results": max_results},
+        )
+
+
+class CreateDirectoryTool:
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="create_directory",
+            description="Create a directory inside the workspace.",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+            permission=ToolPermission.WORKSPACE_WRITE,
+        )
+
+    def execute(self, arguments: dict[str, Any]) -> ToolResult:
+        requested_path = str(arguments["path"])
+        path = resolve_workspace_path(self._workspace_root, requested_path)
+        path.mkdir(parents=True, exist_ok=True)
+        return ToolResult(
+            tool_name=self.definition.name,
+            content=f"Created directory: {requested_path}",
+            metadata={"path": requested_path},
+        )
+
+
+class WriteFileTool:
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="write_file",
+            description="Write a UTF-8 text file inside the workspace.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "content": {"type": "string"},
+                    "overwrite": {"type": "boolean"},
+                },
+                "required": ["path", "content"],
+            },
+            permission=ToolPermission.WORKSPACE_WRITE,
+        )
+
+    def execute(self, arguments: dict[str, Any]) -> ToolResult:
+        requested_path = str(arguments["path"])
+        content = str(arguments["content"])
+        overwrite = bool(arguments.get("overwrite", False))
+        path = resolve_workspace_path(self._workspace_root, requested_path)
+
+        if path.exists() and not overwrite:
+            raise FileExistsError(f"File already exists: {requested_path}")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return ToolResult(
+            tool_name=self.definition.name,
+            content=f"Wrote file: {requested_path}",
+            metadata={"path": requested_path, "overwrite": overwrite},
+        )
+
+
+class CopyFileTool:
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="copy_file",
+            description="Copy a file inside the workspace.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "source": {"type": "string"},
+                    "destination": {"type": "string"},
+                    "overwrite": {"type": "boolean"},
+                },
+                "required": ["source", "destination"],
+            },
+            permission=ToolPermission.WORKSPACE_WRITE,
+        )
+
+    def execute(self, arguments: dict[str, Any]) -> ToolResult:
+        source = str(arguments["source"])
+        destination = str(arguments["destination"])
+        overwrite = bool(arguments.get("overwrite", False))
+        source_path = resolve_workspace_path(self._workspace_root, source)
+        destination_path = resolve_workspace_path(self._workspace_root, destination)
+
+        if not source_path.is_file():
+            raise FileNotFoundError(f"Source file does not exist: {source}")
+        if destination_path.exists() and not overwrite:
+            raise FileExistsError(f"Destination already exists: {destination}")
+
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, destination_path)
+        return ToolResult(
+            tool_name=self.definition.name,
+            content=f"Copied {source} -> {destination}",
+            metadata={"source": source, "destination": destination, "overwrite": overwrite},
+        )
+
+
+class MoveFileTool:
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
+
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="move_file",
+            description="Move a file inside the workspace.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "source": {"type": "string"},
+                    "destination": {"type": "string"},
+                    "overwrite": {"type": "boolean"},
+                },
+                "required": ["source", "destination"],
+            },
+            permission=ToolPermission.FILE_MOVE,
+        )
+
+    def execute(self, arguments: dict[str, Any]) -> ToolResult:
+        source = str(arguments["source"])
+        destination = str(arguments["destination"])
+        overwrite = bool(arguments.get("overwrite", False))
+        source_path = resolve_workspace_path(self._workspace_root, source)
+        destination_path = resolve_workspace_path(self._workspace_root, destination)
+
+        if not source_path.is_file():
+            raise FileNotFoundError(f"Source file does not exist: {source}")
+        if destination_path.exists() and not overwrite:
+            raise FileExistsError(f"Destination already exists: {destination}")
+
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source_path), str(destination_path))
+        return ToolResult(
+            tool_name=self.definition.name,
+            content=f"Moved {source} -> {destination}",
+            metadata={"source": source, "destination": destination, "overwrite": overwrite},
         )

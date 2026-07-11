@@ -196,6 +196,30 @@ Clearing all memories requires a confirmation phrase to prevent accidental data 
 Memory is used as context for ordinary questions. Repository analysis still runs
 through the read-only tool workflow first.
 
+## Permissioned File Operations
+
+Phase 5 adds safe workspace file operations. Write and move operations do not run
+immediately; OscAgent creates a pending action and waits for confirmation.
+
+Examples:
+
+```text
+/ask create folder docs
+/ask copy README.md to docs/README.md
+/ask move draft.txt to archive/draft.txt
+/ask write file notes/todo.txt content Review OscAgent roadmap
+```
+
+OscAgent responds with a pending action:
+
+```text
+Pending action pa_1: Create directory `docs`
+Confirm: /ask 确认执行 pa_1
+Cancel: /ask 取消 pa_1
+```
+
+This phase intentionally does not support deleting files or running arbitrary shell commands.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

@@ -7,6 +7,8 @@ from typing import Any, Protocol
 
 class ToolPermission(StrEnum):
     READ_ONLY = "read_only"
+    WORKSPACE_WRITE = "workspace_write"
+    FILE_MOVE = "file_move"
 
 
 @dataclass(frozen=True)

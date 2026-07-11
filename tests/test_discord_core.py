@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from oscagent.actions import PendingActionStore
 from oscagent.config import Settings
 from oscagent.discord_core import DiscordCommandHandler
 from oscagent.llm import ChatMessage, MockLLMProvider
@@ -27,7 +28,8 @@ def build_memory_handler(tmp_path: Path) -> tuple[DiscordCommandHandler, Recordi
     settings = Settings(OSCAGENT_MODEL="mock:test-model", OSCAGENT_DB_PATH=tmp_path / "test.db")
     provider = RecordingProvider()
     memory_store = MemoryStore(settings.db_path)
-    return DiscordCommandHandler(provider, settings, memory_store), provider
+    action_store = PendingActionStore(settings.db_path)
+    return DiscordCommandHandler(provider, settings, memory_store, action_store, tmp_path), provider
 
 
 def test_handle_ask_returns_mock_response() -> None:
@@ -134,3 +136,45 @@ def test_handle_ask_requires_confirmation_before_clear_all_memories(tmp_path: Pa
 
     assert "Cleared 2" in confirmed.content
     assert not handler.list_memories()
+
+
+def test_handle_ask_creates_directory_only_after_confirmation(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(handler.handle_ask("create folder docs"))
+
+    assert "Pending action pa_1" in pending.content
+    assert not (tmp_path / "docs").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm pa_1"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "docs").is_dir()
+
+
+def test_handle_ask_can_cancel_pending_file_action(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(handler.handle_ask("create folder docs"))
+
+    assert "Pending action pa_1" in pending.content
+    cancelled = asyncio.run(handler.handle_ask("cancel pa_1"))
+
+    assert "Cancelled pa_1" in cancelled.content
+    assert not (tmp_path / "docs").exists()
+
+
+def test_handle_ask_moves_file_after_confirmation(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    (tmp_path / "draft.txt").write_text("draft", encoding="utf-8")
+
+    pending = asyncio.run(handler.handle_ask("move draft.txt to archive/draft.txt"))
+
+    assert "Pending action pa_1" in pending.content
+    assert (tmp_path / "draft.txt").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm pa_1"))
+
+    assert "Executed pa_1" in executed.content
+    assert not (tmp_path / "draft.txt").exists()
+    assert (tmp_path / "archive" / "draft.txt").read_text(encoding="utf-8") == "draft"

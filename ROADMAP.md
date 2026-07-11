@@ -53,6 +53,7 @@
 - Add confirmation flow for write and move operations.
 - Add safe file tools such as create directory, write file, copy file, and move file.
 - Keep all file operations inside approved workspace roots.
+- Store pending actions in SQLite and support confirm/cancel.
 
 ## Phase 6: Planner Agent Loop
 

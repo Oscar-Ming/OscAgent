@@ -52,6 +52,9 @@ class DiscordCommandHandler:
             self._clear_all_pending = False
             return DiscordResponse(f"Cleared {len(deleted)} memory item(s).")
 
+        if self._is_pending_action_list_request(cleaned_prompt):
+            return DiscordResponse(self._format_pending_actions(self._action_store.list_pending()))
+
         confirm_action_id = self._extract_confirm_action_id(cleaned_prompt)
         if confirm_action_id is not None:
             return DiscordResponse(self._execute_pending_action(confirm_action_id))
@@ -70,7 +73,7 @@ class DiscordCommandHandler:
             self._clear_all_pending = True
             return DiscordResponse(
                 f"This will delete all {memory_count} memory item(s). "
-                "To confirm, send `/ask 确认删除所有记忆`."
+                "To confirm, send `/ask \u786e\u8ba4\u5220\u9664\u6240\u6709\u8bb0\u5fc6`."
             )
 
         memory_content = self._extract_memory_request(cleaned_prompt)
@@ -144,6 +147,7 @@ class DiscordCommandHandler:
                     f"- environment: {self._settings.env}",
                     f"- model: {self._settings.model}",
                     f"- memories: {self._memory_store.count()}",
+                    f"- pending actions: {len(self._action_store.list_pending())}",
                     f"- discord configured: {self._settings.discord_bot_token is not None}",
                     f"- OpenAI configured: {self._settings.openai_api_key is not None}",
                     f"- DeepSeek configured: {self._settings.deepseek_api_key is not None}",
@@ -199,7 +203,7 @@ class DiscordCommandHandler:
 
     def _is_memory_list_request(self, prompt: str) -> bool:
         patterns = (
-            r"^(?:\u6211|\u4f60)?\u8bb0\u5f97\u4ec0\u4e48[?？]?$",
+            r"^(?:\u6211|\u4f60)?\u8bb0\u5f97\u4ec0\u4e48[?\uff1f]?$",
             r"^\u5217\u51fa(?:\u6240\u6709)?\u8bb0\u5fc6$",
             r"^\u67e5\u770b(?:\u6240\u6709)?\u8bb0\u5fc6$",
             r"^(?:list|show)\s+(?:all\s+)?memories$",
@@ -246,12 +250,13 @@ class DiscordCommandHandler:
     def _parse_file_action(self, prompt: str) -> tuple[str, list[PendingOperation]] | None:
         create_dir_patterns = (
             r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa\u6587\u4ef6\u5939\s+(.+)$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa(?:\u4e00\u4e2a)?(?:\u540d\u4e3a|\u53eb)?\s*(.+?)\s*\u7684?\u6587\u4ef6\u5939$",
             r"^(?:create|make)\s+(?:directory|folder)\s+(.+)$",
         )
         for pattern in create_dir_patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)
             if match:
-                path = match.group(1).strip()
+                path = self._clean_path(match.group(1))
                 return (
                     f"Create directory `{path}`",
                     [PendingOperation("create_directory", {"path": path})],
@@ -264,8 +269,8 @@ class DiscordCommandHandler:
         for pattern in copy_patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)
             if match:
-                source = match.group(1).strip()
-                destination = match.group(2).strip()
+                source = self._clean_path(match.group(1))
+                destination = self._clean_path(match.group(2))
                 return (
                     f"Copy `{source}` to `{destination}`",
                     [PendingOperation("copy_file", {"source": source, "destination": destination})],
@@ -278,8 +283,8 @@ class DiscordCommandHandler:
         for pattern in move_patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)
             if match:
-                source = match.group(1).strip()
-                destination = match.group(2).strip()
+                source = self._clean_path(match.group(1))
+                destination = self._clean_path(match.group(2))
                 return (
                     f"Move `{source}` to `{destination}`",
                     [PendingOperation("move_file", {"source": source, "destination": destination})],
@@ -287,12 +292,15 @@ class DiscordCommandHandler:
 
         write_patterns = (
             r"^\u5199\u6587\u4ef6\s+(.+?)\s+\u5185\u5bb9\s+(.+)$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa(?:\u4e00\u4e2a)?(?:\u540d\u4e3a|\u53eb)?\s*(.+?)\s*\u7684?\u6587\u4ef6[,\uff0c\s]*\u5185\u5bb9(?:\u662f)?\s+(.+)$",
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa\s+(.+?)\s+\u5185\u5bb9(?:\u662f)?\s+(.+)$",
             r"^write\s+file\s+(.+?)\s+content\s+(.+)$",
+            r"^create\s+(?:a\s+)?file\s+(.+?)\s+with\s+content\s+(.+)$",
         )
         for pattern in write_patterns:
             match = re.match(pattern, prompt, flags=re.IGNORECASE)
             if match:
-                path = match.group(1).strip()
+                path = self._clean_path(match.group(1))
                 content = match.group(2).strip()
                 return (
                     f"Write file `{path}`",
@@ -300,6 +308,18 @@ class DiscordCommandHandler:
                 )
 
         return None
+
+    def _is_pending_action_list_request(self, prompt: str) -> bool:
+        patterns = (
+            r"^\u67e5\u770b(?:\u5f85\u786e\u8ba4|\u5f85\u6267\u884c)(?:\u4efb\u52a1|\u64cd\u4f5c)$",
+            r"^\u5217\u51fa(?:\u5f85\u786e\u8ba4|\u5f85\u6267\u884c)(?:\u4efb\u52a1|\u64cd\u4f5c)$",
+            r"^(?:list|show)\s+pending\s+(?:actions|tasks|operations)$",
+            r"^pending\s+(?:actions|tasks|operations)$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _clean_path(self, path: str) -> str:
+        return path.strip().strip("`'\"")
 
     def _execute_pending_action(self, action_id: int) -> str:
         action = self._action_store.get(action_id)
@@ -344,6 +364,17 @@ class DiscordCommandHandler:
                 f"Cancel: /ask \u53d6\u6d88 pa_{action.id}",
             ]
         )
+
+    def _format_pending_actions(self, actions: list[PendingAction]) -> str:
+        if not actions:
+            return "No pending actions."
+
+        lines = ["Pending actions:"]
+        for action in actions:
+            lines.append(f"pa_{action.id}: {action.description}")
+            for operation in action.operations:
+                lines.append(f"- `{operation.tool_name}` {operation.arguments}")
+        return "\n".join(lines)
 
     def _format_memories(self, memories: list[MemoryRecord]) -> str:
         if not memories:

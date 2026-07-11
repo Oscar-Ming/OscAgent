@@ -54,6 +54,7 @@
 - Add safe file tools such as create directory, write file, copy file, and move file.
 - Keep all file operations inside approved workspace roots.
 - Store pending actions in SQLite and support confirm/cancel.
+- Add natural-language variants and pending action inspection.
 
 ## Phase 6: Planner Agent Loop
 

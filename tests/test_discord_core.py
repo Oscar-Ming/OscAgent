@@ -57,6 +57,15 @@ def test_handle_status_reports_model() -> None:
     assert "- model: mock:test-model" in response.content
 
 
+def test_handle_status_reports_pending_actions(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    asyncio.run(handler.handle_ask("create folder docs"))
+
+    response = asyncio.run(handler.handle_status())
+
+    assert "- pending actions: 1" in response.content
+
+
 def test_handle_ask_routes_repo_analysis() -> None:
     handler = build_handler()
 
@@ -178,3 +187,48 @@ def test_handle_ask_moves_file_after_confirmation(tmp_path: Path) -> None:
     assert "Executed pa_1" in executed.content
     assert not (tmp_path / "draft.txt").exists()
     assert (tmp_path / "archive" / "draft.txt").read_text(encoding="utf-8") == "draft"
+
+
+def test_handle_ask_can_list_pending_actions(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    asyncio.run(handler.handle_ask("create folder docs"))
+
+    response = asyncio.run(handler.handle_ask("list pending actions"))
+
+    assert "Pending actions:" in response.content
+    assert "pa_1: Create directory `docs`" in response.content
+
+
+def test_handle_ask_writes_file_from_natural_language_after_confirmation(
+    tmp_path: Path,
+) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(
+        handler.handle_ask("create a file scratch/test.txt with content hello")
+    )
+
+    assert "Pending action pa_1" in pending.content
+    assert not (tmp_path / "scratch" / "test.txt").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm pa_1"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "scratch" / "test.txt").read_text(encoding="utf-8") == "hello"
+
+
+def test_handle_ask_writes_file_from_chinese_natural_language(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(
+        handler.handle_ask(
+            "\u521b\u5efa\u4e00\u4e2a\u53eb scratch/test.txt "
+            "\u7684\u6587\u4ef6\uff0c\u5185\u5bb9\u662f hello"
+        )
+    )
+
+    assert "Pending action pa_1" in pending.content
+    executed = asyncio.run(handler.handle_ask("confirm pa_1"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "scratch" / "test.txt").read_text(encoding="utf-8") == "hello"

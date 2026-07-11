@@ -205,9 +205,13 @@ Examples:
 
 ```text
 /ask create folder docs
+/ask 创建一个叫 docs 的文件夹
 /ask copy README.md to docs/README.md
 /ask move draft.txt to archive/draft.txt
 /ask write file notes/todo.txt content Review OscAgent roadmap
+/ask create a file notes/todo.txt with content Review OscAgent roadmap
+/ask 创建一个叫 notes/todo.txt 的文件，内容是 Review OscAgent roadmap
+/ask list pending actions
 ```
 
 OscAgent responds with a pending action:

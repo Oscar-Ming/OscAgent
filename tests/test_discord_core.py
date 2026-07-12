@@ -258,6 +258,42 @@ def test_handle_ask_writes_file_from_chinese_natural_language(tmp_path: Path) ->
     assert (tmp_path / "scratch" / "test.txt").read_text(encoding="utf-8") == "hello"
 
 
+def test_handle_ask_creates_two_txt_files_after_confirmation(tmp_path: Path) -> None:
+    handler, provider = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(handler.handle_ask("create two txt files in scratch"))
+
+    assert "Pending action pa_1" in pending.content
+    assert pending.content.count("`write_file`") == 2
+    assert provider.messages == []
+    assert not (tmp_path / "scratch" / "file1.txt").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "scratch" / "file1.txt").read_text(encoding="utf-8")
+    assert (tmp_path / "scratch" / "file2.txt").read_text(encoding="utf-8")
+
+
+def test_handle_ask_creates_two_txt_files_from_chinese_request(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+
+    pending = asyncio.run(
+        handler.handle_ask(
+            "\u5728 scratch \u521b\u5efa\u4e24\u4e2a\u4e0d\u540c\u7684txt\u6587\u4ef6"
+        )
+    )
+
+    assert "Pending action pa_1" in pending.content
+    assert pending.content.count("`write_file`") == 2
+
+    executed = asyncio.run(handler.handle_ask("confirm"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "scratch" / "file1.txt").is_file()
+    assert (tmp_path / "scratch" / "file2.txt").is_file()
+
+
 def test_handle_ask_plans_file_organization_before_confirmation(tmp_path: Path) -> None:
     handler, _ = build_memory_handler(tmp_path)
     (tmp_path / "scratch").mkdir()

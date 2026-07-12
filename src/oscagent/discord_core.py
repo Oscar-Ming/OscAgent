@@ -273,6 +273,10 @@ class DiscordCommandHandler:
         return None
 
     def _parse_file_action(self, prompt: str) -> tuple[str, list[PendingOperation]] | None:
+        multi_write_action = self._parse_multi_file_creation(prompt)
+        if multi_write_action:
+            return multi_write_action
+
         create_dir_patterns = (
             r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa\u6587\u4ef6\u5939\s+(.+)$",
             r"^(?:\u8bf7)?(?:\u5e2e\u6211)?\u521b\u5efa(?:\u4e00\u4e2a)?(?:\u540d\u4e3a|\u53eb)?\s*(.+?)\s*\u7684?\u6587\u4ef6\u5939$",
@@ -331,6 +335,50 @@ class DiscordCommandHandler:
                     f"Write file `{path}`",
                     [PendingOperation("write_file", {"path": path, "content": content})],
                 )
+
+        return None
+
+    def _parse_multi_file_creation(self, prompt: str) -> tuple[str, list[PendingOperation]] | None:
+        patterns = (
+            (
+                r"^(?:\u8bf7)?(?:\u5e2e\u6211)?(?:\u5728\s+(.+?)\s+)?"
+                r"\u521b\u5efa(?:\u4e24\u4e2a|2\u4e2a|\u4e8c\u4e2a|2)\s*"
+                r"(?:\u4e0d\u540c\u7684)?\s*(txt|md)\u6587\u4ef6$"
+            ),
+            (
+                r"^create\s+(?:two|2)\s+(?:different\s+)?(txt|md)\s+files"
+                r"(?:\s+in\s+(.+))?$"
+            ),
+        )
+        for pattern in patterns:
+            match = re.match(pattern, prompt, flags=re.IGNORECASE)
+            if not match:
+                continue
+            groups = match.groups()
+            if pattern.startswith(r"^(?:\u8bf7)"):
+                directory = self._clean_path(groups[0] or ".")
+                extension = groups[1].lower()
+            else:
+                extension = groups[0].lower()
+                directory = self._clean_path(groups[1] or ".")
+
+            operations = []
+            for index in range(1, 3):
+                filename = f"file{index}.{extension}"
+                path = filename if directory == "." else f"{directory}/{filename}"
+                operations.append(
+                    PendingOperation(
+                        "write_file",
+                        {
+                            "path": path,
+                            "content": f"Created by OscAgent file {index}.\n",
+                        },
+                    )
+                )
+            return (
+                f"Create two {extension} files in `{directory}`",
+                operations,
+            )
 
         return None
 

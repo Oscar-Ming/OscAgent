@@ -121,6 +121,26 @@ def test_handle_ask_can_forget_memory_from_natural_language(tmp_path: Path) -> N
     assert "\u6211\u559c\u6b22\u84dd\u8272" in remaining
 
 
+def test_handle_ask_does_not_route_file_delete_to_memory(tmp_path: Path) -> None:
+    handler, provider = build_memory_handler(tmp_path)
+
+    response = asyncio.run(
+        handler.handle_ask("\u5220\u9664scratch\u91cc\u9762\u7684\u6240\u6709\u6587\u4ef6")
+    )
+
+    assert "File deletion is not supported yet" in response.content
+    assert provider.messages == []
+
+
+def test_handle_ask_rejects_english_file_delete_request(tmp_path: Path) -> None:
+    handler, provider = build_memory_handler(tmp_path)
+
+    response = asyncio.run(handler.handle_ask("delete all files in scratch"))
+
+    assert "File deletion is not supported yet" in response.content
+    assert provider.messages == []
+
+
 def test_handle_ask_can_list_memories_from_natural_language(tmp_path: Path) -> None:
     handler, _ = build_memory_handler(tmp_path)
     handler.remember("\u6211\u559c\u6b22\u84dd\u8272")

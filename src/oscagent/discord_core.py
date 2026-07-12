@@ -87,6 +87,13 @@ class DiscordCommandHandler:
             memory = self.remember(memory_content)
             return DiscordResponse(f"Stored memory {memory.id}: {memory.content}")
 
+        if self._is_unsupported_file_delete_request(cleaned_prompt):
+            return DiscordResponse(
+                "File deletion is not supported yet. OscAgent can create, write, copy, "
+                "move, and organize files with confirmation, but delete operations are "
+                "still disabled for safety."
+            )
+
         forget_query = self._extract_forget_request(cleaned_prompt)
         if forget_query:
             deleted = self.forget_memories_matching(forget_query)
@@ -210,6 +217,13 @@ class DiscordCommandHandler:
                 content = match.group(1).strip()
                 return content or None
         return None
+
+    def _is_unsupported_file_delete_request(self, prompt: str) -> bool:
+        patterns = (
+            r"^(?:\u8bf7)?(?:\u5e2e\u6211)?(?:\u5220\u9664|\u6e05\u7a7a).*(?:\u6587\u4ef6|txt|md|\.txt|\.md|scratch|archive).*$",
+            r"^(?:delete|remove|clear)\s+.*(?:files?|txt|md|\.txt|\.md|scratch|archive).*$",
+        )
+        return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
 
     def _is_memory_list_request(self, prompt: str) -> bool:
         patterns = (

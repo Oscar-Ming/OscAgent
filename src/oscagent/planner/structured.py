@@ -40,10 +40,10 @@ class StructuredToolPlanner:
         self._max_operations = max_operations
         self._max_workspace_entries = max_workspace_entries
 
-    async def plan(self, prompt: str) -> StructuredToolPlan:
+    async def plan(self, prompt: str, *, context: str | None = None) -> StructuredToolPlan:
         response = await self._llm_provider.chat(
             [
-                ChatMessage(role="system", content=self._system_prompt()),
+                ChatMessage(role="system", content=self._system_prompt(context)),
                 ChatMessage(role="user", content=prompt),
             ],
             model=self._model,
@@ -51,24 +51,39 @@ class StructuredToolPlanner:
         payload = self._parse_json(response)
         return self._validate_payload(payload)
 
-    def _system_prompt(self) -> str:
+    def _system_prompt(self, context: str | None = None) -> str:
         tool_payload = [self._serialize_definition(item) for item in self._registry.definitions()]
-        return "\n".join(
-            [
-                "You are the planning component of OscAgent.",
-                "Convert the user's workspace request into a JSON tool plan.",
-                "Return JSON only, with no markdown or explanation.",
-                "Use only the registered tools and preserve the user's requested filenames.",
-                "Every operation is reviewed and confirmed by the user before execution.",
-                "Do not invent source files that are absent from the workspace listing.",
-                f"The plan may contain at most {self._max_operations} operations.",
-                'Schema: {"description": "short summary", "operations": '
-                '[{"tool_name": "tool", "arguments": {}}]}',
-                f"Registered tools: {json.dumps(tool_payload, ensure_ascii=False)}",
-                "Current workspace entries:",
-                self._workspace_listing(),
-            ]
-        )
+        lines = [
+            "You are the planning component of OscAgent.",
+            "Convert the user's workspace request into a JSON tool plan.",
+            "Return JSON only, with no markdown or explanation.",
+            "Use only the registered tools and preserve the user's requested filenames.",
+            "Every operation is reviewed and confirmed by the user before execution.",
+            "Do not invent source files that are absent from the workspace listing.",
+            f"The plan may contain at most {self._max_operations} operations.",
+            'Schema: {"description": "short summary", "operations": '
+            '[{"tool_name": "tool", "arguments": {}}]}',
+            f"Registered tools: {json.dumps(tool_payload, ensure_ascii=False)}",
+            "Current workspace entries:",
+            self._workspace_listing(),
+        ]
+        tool_names = {item.name for item in self._registry.definitions()}
+        if "git_commit" in tool_names:
+            lines.extend(
+                [
+                    "Development workflow rules:",
+                    "- Read-only development tools execute immediately and do not "
+                    "need confirmation.",
+                    "- Every git_commit plan must include run_tests and run_lint first.",
+                    "- git_commit paths must be explicit changed paths, never '.' or '*'.",
+                    "- Never include secrets, .env files, or unrelated untracked files.",
+                    "- Never put git_commit and git_push in the same plan.",
+                    "- Use git_push only when the user explicitly asks to push.",
+                ]
+            )
+        if context:
+            lines.extend(["Trusted runtime context:", context])
+        return "\n".join(lines)
 
     def _workspace_listing(self) -> str:
         root = self._workspace_root.resolve()
@@ -158,6 +173,18 @@ class StructuredToolPlanner:
                 raise ValueError(f"Operation {index} argument {name!r} must be a string.")
             if expected_type == "boolean" and not isinstance(value, bool):
                 raise ValueError(f"Operation {index} argument {name!r} must be a boolean.")
+            if expected_type == "integer" and (
+                not isinstance(value, int) or isinstance(value, bool)
+            ):
+                raise ValueError(f"Operation {index} argument {name!r} must be an integer.")
+            if expected_type == "array":
+                if not isinstance(value, list):
+                    raise ValueError(f"Operation {index} argument {name!r} must be an array.")
+                item_type = properties[name].get("items", {}).get("type")
+                if item_type == "string" and not all(isinstance(item, str) for item in value):
+                    raise ValueError(
+                        f"Operation {index} argument {name!r} must contain only strings."
+                    )
             if name in self._PATH_ARGUMENTS:
                 if not isinstance(value, str) or not value.strip():
                     raise ValueError(f"Operation {index} path {name!r} cannot be empty.")

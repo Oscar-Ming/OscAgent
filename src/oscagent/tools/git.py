@@ -27,6 +27,10 @@ class GitStatusTool:
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            shell=False,
         )
 
         content = completed.stdout.strip()

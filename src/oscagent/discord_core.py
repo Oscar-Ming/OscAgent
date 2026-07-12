@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from oscagent.actions import PendingAction, PendingActionStore, PendingOperation
-from oscagent.agent import RepoAnalysisAgent, is_repo_analysis_request
+from oscagent.agent import DevelopmentWorkflowAgent, RepoAnalysisAgent, is_repo_analysis_request
 from oscagent.config import Settings
 from oscagent.llm import ChatMessage, LLMProvider
 from oscagent.memory import MemoryRecord, MemoryStore
@@ -13,6 +13,8 @@ from oscagent.planner import FileOrganizerPlanner, StructuredToolPlanner
 from oscagent.tools import (
     CopyFileTool,
     CreateDirectoryTool,
+    GitCommitTool,
+    GitPushTool,
     MoveFileTool,
     ToolRegistry,
     WriteFileTool,
@@ -38,12 +40,18 @@ class DiscordCommandHandler:
         self._memory_store = memory_store or MemoryStore(self._settings.db_path)
         self._action_store = action_store or PendingActionStore(self._settings.db_path)
         self._workspace_root = workspace_root or Path.cwd()
-        self._write_tools = self._build_write_tools()
+        self._file_tools = self._build_file_tools()
+        self._action_tools = self._build_action_tools()
         self._file_organizer = FileOrganizerPlanner(self._workspace_root)
         self._structured_planner = StructuredToolPlanner(
             self._llm_provider,
             self._settings.model,
-            self._write_tools,
+            self._file_tools,
+            self._workspace_root,
+        )
+        self._development_agent = DevelopmentWorkflowAgent(
+            self._llm_provider,
+            self._settings,
             self._workspace_root,
         )
         self._clear_all_pending = False
@@ -100,6 +108,12 @@ class DiscordCommandHandler:
                 "still disabled for safety."
             )
 
+        if self._is_unsupported_shell_request(cleaned_prompt):
+            return DiscordResponse(
+                "Arbitrary shell commands are not supported. Phase 7 only allows "
+                "registered test, lint, and Git tools."
+            )
+
         forget_query = self._extract_forget_request(cleaned_prompt)
         if forget_query:
             deleted = self.forget_memories_matching(forget_query)
@@ -109,6 +123,9 @@ class DiscordCommandHandler:
             return DiscordResponse(
                 f"Forgot {len(deleted)} matching memory item(s):\n{deleted_lines}"
             )
+
+        if self._is_development_request(cleaned_prompt):
+            return await self._handle_development_request(cleaned_prompt)
 
         organization_plan = self._plan_file_organization(cleaned_prompt)
         if organization_plan:
@@ -238,6 +255,64 @@ class DiscordCommandHandler:
             r"^(?:delete|remove|clear)\s+.*(?:files?|txt|md|\.txt|\.md|scratch|archive).*$",
         )
         return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
+
+    def _is_unsupported_shell_request(self, prompt: str) -> bool:
+        lowered = prompt.lower()
+        shell_terms = ("powershell", "cmd.exe", "bash", "shell", "rm -rf", "del /", "命令行")
+        execution_terms = ("run", "execute", "执行", "运行")
+        return any(term in lowered for term in shell_terms) and any(
+            term in lowered for term in execution_terms
+        )
+
+    def _is_development_request(self, prompt: str) -> bool:
+        lowered = prompt.lower()
+        terms = (
+            "pytest",
+            "ruff",
+            "lint",
+            "git status",
+            "git diff",
+            "git log",
+            "commit",
+            "push",
+            "运行测试",
+            "执行测试",
+            "代码检查",
+            "git状态",
+            "git 状态",
+            "提交代码",
+            "创建提交",
+            "推送到github",
+            "推送到 github",
+            "推送代码",
+        )
+        return any(term in lowered for term in terms)
+
+    async def _handle_development_request(self, prompt: str) -> DiscordResponse:
+        try:
+            result = await self._development_agent.run(prompt)
+        except ValueError as exc:
+            return DiscordResponse(f"Cannot create a safe development plan: {exc}")
+
+        lines = [f"Development plan: {result.description}"]
+        if result.trace.steps:
+            lines.extend(["Tool trace:", result.trace.to_markdown()])
+        for observation in result.observations:
+            content = observation.content
+            if len(content) > 900:
+                content = content[:900].rstrip() + "\n...[truncated]"
+            lines.extend([f"Result `{observation.tool_name}`:", content])
+        if result.blocked_reason:
+            lines.append(f"Blocked: {result.blocked_reason}")
+            return DiscordResponse("\n".join(lines)[:1950])
+        if not result.pending_operations:
+            lines.append("All requested read-only tools completed successfully.")
+            lines.append("No write operation was requested.")
+            return DiscordResponse("\n".join(lines)[:1950])
+
+        action = self._action_store.create(result.description, result.pending_operations)
+        lines.append(self._format_pending_action(action, planner="Phase 7 development"))
+        return DiscordResponse("\n".join(lines)[:1950])
 
     def _is_memory_list_request(self, prompt: str) -> bool:
         patterns = (
@@ -480,8 +555,10 @@ class DiscordCommandHandler:
         results: list[str] = []
         try:
             for operation in action.operations:
-                tool = self._write_tools.get(operation.tool_name)
+                tool = self._action_tools.get(operation.tool_name)
                 result = tool.execute(operation.arguments)
+                if result.metadata and int(result.metadata.get("returncode", 0)) != 0:
+                    raise RuntimeError(result.content)
                 results.append(f"- {result.content}")
         except Exception as exc:  # noqa: BLE001 - execution errors should be visible to the user.
             return f"Failed to execute pa_{action_id}: {exc}"
@@ -569,10 +646,16 @@ class DiscordCommandHandler:
         lines.extend(f"{memory.id}. [{memory.scope}] {memory.content}" for memory in memories)
         return "\n".join(lines)
 
-    def _build_write_tools(self) -> ToolRegistry:
+    def _build_file_tools(self) -> ToolRegistry:
         registry = ToolRegistry()
         registry.register(CreateDirectoryTool(self._workspace_root))
         registry.register(WriteFileTool(self._workspace_root))
         registry.register(CopyFileTool(self._workspace_root))
         registry.register(MoveFileTool(self._workspace_root))
+        return registry
+
+    def _build_action_tools(self) -> ToolRegistry:
+        registry = self._build_file_tools()
+        registry.register(GitCommitTool(self._workspace_root))
+        registry.register(GitPushTool(self._workspace_root))
         return registry

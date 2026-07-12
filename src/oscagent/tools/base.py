@@ -9,6 +9,8 @@ class ToolPermission(StrEnum):
     READ_ONLY = "read_only"
     WORKSPACE_WRITE = "workspace_write"
     FILE_MOVE = "file_move"
+    GIT_WRITE = "git_write"
+    REMOTE_WRITE = "remote_write"
 
 
 @dataclass(frozen=True)

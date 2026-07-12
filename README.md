@@ -248,6 +248,36 @@ requests are sent to the configured model for structured planning. Only register
 tools are accepted; paths remain inside the workspace, deletion is unavailable,
 and each plan is capped at 20 operations.
 
+## Safe Development and Git Workflows
+
+Phase 7 adds registered development tools instead of arbitrary shell access. Read-only
+tools run immediately with fixed commands, timeouts, bounded output, and a visible trace.
+
+Available tools:
+
+| Tool | Purpose | Confirmation |
+| --- | --- | --- |
+| `run_tests` | Run the complete pytest suite. | No |
+| `run_lint` | Run Ruff checks. | No |
+| `git_status` | Inspect branch and working tree state. | No |
+| `git_diff` | Inspect staged or unstaged changes. | No |
+| `git_log` | Inspect recent commits. | No |
+| `git_commit` | Stage explicit paths and create a commit. | Required |
+| `git_push` | Push a branch to a configured remote without force. | Required separately |
+
+Examples:
+
+```text
+/ask 检查Git状态，运行全部测试和Ruff检查，并告诉我是否适合提交
+/ask 运行测试和代码检查，通过后提交README.md，提交信息为 update docs
+/ask 把当前main分支推送到GitHub
+```
+
+Failed tests or lint checks block later Git writes. Commit plans cannot broadly stage
+`.` or `*`, sensitive files such as `.env` are rejected, and commit and push cannot
+share one confirmation. PowerShell, Bash, CMD, force push, and arbitrary commands remain
+unavailable.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

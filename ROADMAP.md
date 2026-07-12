@@ -69,8 +69,12 @@
 
 ## Phase 7: Safe Shell and Git Tools
 
-- Add allowlisted shell commands such as tests, lint, and Git inspection.
-- Add Git workflow helpers with confirmation for commit and push.
+- Add registered read-only tools for pytest, Ruff, Git status, diff, and log.
+- Run commands without a shell, with fixed arguments, timeouts, and output limits.
+- Add model-driven development plans with visible tool traces.
+- Block Git writes when tests or lint checks fail.
+- Require explicit paths and confirmation for commits, with sensitive-file protection.
+- Require a separate confirmation for non-force pushes to configured remotes.
 
 ## Phase 8: Browser Automation
 

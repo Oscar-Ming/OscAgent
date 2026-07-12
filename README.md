@@ -227,11 +227,12 @@ for example `/ask 确认执行 pa_2`.
 
 This phase intentionally does not support deleting files or running arbitrary shell commands.
 
-## Bounded Planner
+## Planner Agent Loop
 
-Phase 6 adds the first planner loop in a deliberately small, safe form. OscAgent
-can turn one file-organization request into multiple pending file operations.
-The plan is shown first and must be confirmed before anything is moved.
+Phase 6 adds a model-driven, provider-independent planner. OscAgent can turn a
+natural-language workspace request into a JSON plan containing multiple registered
+tool operations. The plan is validated and shown first, and must be confirmed before
+anything is changed.
 
 Examples:
 
@@ -239,11 +240,13 @@ Examples:
 /ask organize txt files in scratch to archive
 /ask move all md files from notes to archive/notes
 /ask 把 scratch 里的 txt 文件整理到 archive
+/ask 把 scratch 里的 test.txt 和 test2.txt 整理到 gooner 文件夹
 ```
 
-For example, if `scratch` contains `a.txt` and `b.txt`, OscAgent creates one
-pending action with two `move_file` operations. It still uses the workspace
-sandbox, does not delete files, and caps each plan at 20 operations.
+Simple known request forms still use deterministic fast paths. Other workspace
+requests are sent to the configured model for structured planning. Only registered
+tools are accepted; paths remain inside the workspace, deletion is unavailable,
+and each plan is capped at 20 operations.
 
 ## Roadmap
 

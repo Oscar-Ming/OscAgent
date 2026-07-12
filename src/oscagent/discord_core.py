@@ -9,7 +9,7 @@ from oscagent.agent import RepoAnalysisAgent, is_repo_analysis_request
 from oscagent.config import Settings
 from oscagent.llm import ChatMessage, LLMProvider
 from oscagent.memory import MemoryRecord, MemoryStore
-from oscagent.planner import FileOrganizerPlanner
+from oscagent.planner import FileOrganizerPlanner, StructuredToolPlanner
 from oscagent.tools import (
     CopyFileTool,
     CreateDirectoryTool,
@@ -40,6 +40,12 @@ class DiscordCommandHandler:
         self._workspace_root = workspace_root or Path.cwd()
         self._write_tools = self._build_write_tools()
         self._file_organizer = FileOrganizerPlanner(self._workspace_root)
+        self._structured_planner = StructuredToolPlanner(
+            self._llm_provider,
+            self._settings.model,
+            self._write_tools,
+            self._workspace_root,
+        )
         self._clear_all_pending = False
 
     async def handle_ask(self, prompt: str) -> DiscordResponse:
@@ -112,6 +118,14 @@ class DiscordCommandHandler:
         if file_action:
             action = self._action_store.create(file_action[0], file_action[1])
             return DiscordResponse(self._format_pending_action(action))
+
+        if self._is_workspace_action_request(cleaned_prompt):
+            try:
+                plan = await self._structured_planner.plan(cleaned_prompt)
+            except ValueError as exc:
+                return DiscordResponse(f"Cannot create a safe tool plan: {exc}")
+            action = self._action_store.create(plan.description, plan.operations)
+            return DiscordResponse(self._format_pending_action(action, planner="LLM structured"))
 
         if is_repo_analysis_request(cleaned_prompt):
             agent = RepoAnalysisAgent(self._llm_provider, self._settings)
@@ -419,6 +433,40 @@ class DiscordCommandHandler:
         )
         return any(re.match(pattern, prompt, flags=re.IGNORECASE) for pattern in patterns)
 
+    def _is_workspace_action_request(self, prompt: str) -> bool:
+        action_terms = (
+            "create",
+            "make",
+            "write",
+            "copy",
+            "move",
+            "organize",
+            "put",
+            "创建",
+            "新建",
+            "写入",
+            "复制",
+            "移动",
+            "整理",
+            "放入",
+            "放到",
+        )
+        workspace_terms = (
+            "file",
+            "folder",
+            "directory",
+            "workspace",
+            "文件",
+            "文件夹",
+            "目录",
+            "scratch",
+            "archive",
+        )
+        lowered = prompt.lower()
+        return any(term in lowered for term in action_terms) and any(
+            term in lowered for term in workspace_terms
+        )
+
     def _clean_path(self, path: str) -> str:
         return path.strip().strip("`'\"")
 
@@ -475,15 +523,24 @@ class DiscordCommandHandler:
             )
         return actions[0]
 
-    def _format_pending_action(self, action: PendingAction) -> str:
+    def _format_pending_action(
+        self,
+        action: PendingAction,
+        *,
+        planner: str | None = None,
+    ) -> str:
         operation_lines = [
             f"- `{operation.tool_name}` {operation.arguments}"
             for operation in action.operations
         ]
-        return "\n".join(
-            [
+        lines = [
                 f"Pending action pa_{action.id}: {action.description}",
                 "This will modify workspace files.",
+        ]
+        if planner:
+            lines.append(f"Plan trace: {planner} planner -> validated tool plan")
+        lines.extend(
+            [
                 "Operations:",
                 *operation_lines,
                 "Confirm: /ask \u786e\u8ba4\u6267\u884c",
@@ -491,6 +548,7 @@ class DiscordCommandHandler:
                 f"Precise confirm: /ask \u786e\u8ba4\u6267\u884c pa_{action.id}",
             ]
         )
+        return "\n".join(lines)
 
     def _format_pending_actions(self, actions: list[PendingAction]) -> str:
         if not actions:

@@ -58,12 +58,14 @@
 
 ## Phase 6: Planner Agent Loop
 
-- Add a bounded file-organization planner that turns one request into multiple
-  registered tool operations.
-- Enforce maximum operation counts.
+- Add a model-driven planner that turns natural-language workspace requests into
+  multiple registered tool operations.
+- Use one provider-independent JSON plan protocol for DeepSeek, OpenAI, and future
+  model providers.
+- Validate tool names, argument schemas, workspace paths, and operation counts.
 - Route planned write/move actions into pending confirmation instead of executing
   immediately.
-- Keep future planner expansion traceable and scoped.
+- Record a visible plan trace and retain deterministic planners as reliable fast paths.
 
 ## Phase 7: Safe Shell and Git Tools
 

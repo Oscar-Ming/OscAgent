@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 from oscagent.actions import PendingActionStore
@@ -22,6 +23,32 @@ class RecordingProvider:
     async def chat(self, messages: list[ChatMessage], *, model: str) -> str:
         self.messages = messages
         return "recorded response"
+
+
+class StructuredPlanProvider:
+    async def chat(self, messages: list[ChatMessage], *, model: str) -> str:
+        return json.dumps(
+            {
+                "description": "Move named test files into gooner",
+                "operations": [
+                    {"tool_name": "create_directory", "arguments": {"path": "gooner"}},
+                    {
+                        "tool_name": "move_file",
+                        "arguments": {
+                            "source": "scratch/test.txt",
+                            "destination": "gooner/test.txt",
+                        },
+                    },
+                    {
+                        "tool_name": "move_file",
+                        "arguments": {
+                            "source": "scratch/test2.txt",
+                            "destination": "gooner/test2.txt",
+                        },
+                    },
+                ],
+            }
+        )
 
 
 def build_memory_handler(tmp_path: Path) -> tuple[DiscordCommandHandler, RecordingProvider]:
@@ -347,3 +374,37 @@ def test_handle_ask_reports_no_matching_files_for_organization(tmp_path: Path) -
     response = asyncio.run(handler.handle_ask("organize txt files in scratch to archive"))
 
     assert response.content == "No matching files found for that organization request."
+
+
+def test_handle_ask_routes_unmatched_workspace_request_to_structured_planner(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(OSCAGENT_MODEL="deepseek:deepseek-chat", OSCAGENT_DB_PATH=tmp_path / "db")
+    handler = DiscordCommandHandler(
+        StructuredPlanProvider(),
+        settings,
+        MemoryStore(settings.db_path),
+        PendingActionStore(settings.db_path),
+        tmp_path,
+    )
+    (tmp_path / "scratch").mkdir()
+    (tmp_path / "scratch" / "test.txt").write_text("one", encoding="utf-8")
+    (tmp_path / "scratch" / "test2.txt").write_text("two", encoding="utf-8")
+
+    pending = asyncio.run(
+        handler.handle_ask(
+            "\u628ascratch\u91cc\u9762\u7684test\u6587\u4ef6\u548ctest2\u6587\u4ef6"
+            "\u6574\u7406\u597d\u653e\u5165gooner\u6587\u4ef6\u5939"
+        )
+    )
+
+    assert "Pending action pa_1" in pending.content
+    assert "Plan trace: LLM structured planner" in pending.content
+    assert pending.content.count("`move_file`") == 2
+    assert (tmp_path / "scratch" / "test.txt").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm"))
+
+    assert "Executed pa_1" in executed.content
+    assert (tmp_path / "gooner" / "test.txt").read_text(encoding="utf-8") == "one"
+    assert (tmp_path / "gooner" / "test2.txt").read_text(encoding="utf-8") == "two"

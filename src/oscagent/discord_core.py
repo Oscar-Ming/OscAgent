@@ -9,6 +9,7 @@ from oscagent.agent import RepoAnalysisAgent, is_repo_analysis_request
 from oscagent.config import Settings
 from oscagent.llm import ChatMessage, LLMProvider
 from oscagent.memory import MemoryRecord, MemoryStore
+from oscagent.planner import FileOrganizerPlanner
 from oscagent.tools import (
     CopyFileTool,
     CreateDirectoryTool,
@@ -38,6 +39,7 @@ class DiscordCommandHandler:
         self._action_store = action_store or PendingActionStore(self._settings.db_path)
         self._workspace_root = workspace_root or Path.cwd()
         self._write_tools = self._build_write_tools()
+        self._file_organizer = FileOrganizerPlanner(self._workspace_root)
         self._clear_all_pending = False
 
     async def handle_ask(self, prompt: str) -> DiscordResponse:
@@ -94,6 +96,10 @@ class DiscordCommandHandler:
             return DiscordResponse(
                 f"Forgot {len(deleted)} matching memory item(s):\n{deleted_lines}"
             )
+
+        organization_plan = self._plan_file_organization(cleaned_prompt)
+        if organization_plan:
+            return organization_plan
 
         file_action = self._parse_file_action(cleaned_prompt)
         if file_action:
@@ -327,6 +333,20 @@ class DiscordCommandHandler:
                 )
 
         return None
+
+    def _plan_file_organization(self, prompt: str) -> DiscordResponse | None:
+        try:
+            plan = self._file_organizer.plan(prompt)
+        except (FileNotFoundError, ValueError) as exc:
+            return DiscordResponse(f"Cannot plan file organization: {exc}")
+
+        if not plan:
+            return None
+        if not plan.operations:
+            return DiscordResponse("No matching files found for that organization request.")
+
+        action = self._action_store.create(plan.description, plan.operations)
+        return DiscordResponse(self._format_pending_action(action))
 
     def _is_pending_action_list_request(self, prompt: str) -> bool:
         patterns = (

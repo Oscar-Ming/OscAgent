@@ -256,3 +256,38 @@ def test_handle_ask_writes_file_from_chinese_natural_language(tmp_path: Path) ->
 
     assert "Executed pa_1" in executed.content
     assert (tmp_path / "scratch" / "test.txt").read_text(encoding="utf-8") == "hello"
+
+
+def test_handle_ask_plans_file_organization_before_confirmation(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    (tmp_path / "scratch").mkdir()
+    (tmp_path / "scratch" / "a.txt").write_text("a", encoding="utf-8")
+    (tmp_path / "scratch" / "b.txt").write_text("b", encoding="utf-8")
+    (tmp_path / "scratch" / "c.md").write_text("c", encoding="utf-8")
+
+    pending = asyncio.run(handler.handle_ask("organize txt files in scratch to archive"))
+
+    assert "Pending action pa_1" in pending.content
+    assert "Organize txt files" in pending.content
+    assert pending.content.count("`move_file`") == 2
+    assert (tmp_path / "scratch" / "a.txt").exists()
+    assert not (tmp_path / "archive" / "a.txt").exists()
+
+    executed = asyncio.run(handler.handle_ask("confirm"))
+
+    assert "Executed pa_1" in executed.content
+    assert not (tmp_path / "scratch" / "a.txt").exists()
+    assert not (tmp_path / "scratch" / "b.txt").exists()
+    assert (tmp_path / "scratch" / "c.md").exists()
+    assert (tmp_path / "archive" / "a.txt").read_text(encoding="utf-8") == "a"
+    assert (tmp_path / "archive" / "b.txt").read_text(encoding="utf-8") == "b"
+
+
+def test_handle_ask_reports_no_matching_files_for_organization(tmp_path: Path) -> None:
+    handler, _ = build_memory_handler(tmp_path)
+    (tmp_path / "scratch").mkdir()
+    (tmp_path / "scratch" / "a.md").write_text("a", encoding="utf-8")
+
+    response = asyncio.run(handler.handle_ask("organize txt files in scratch to archive"))
+
+    assert response.content == "No matching files found for that organization request."

@@ -227,6 +227,24 @@ for example `/ask 确认执行 pa_2`.
 
 This phase intentionally does not support deleting files or running arbitrary shell commands.
 
+## Bounded Planner
+
+Phase 6 adds the first planner loop in a deliberately small, safe form. OscAgent
+can turn one file-organization request into multiple pending file operations.
+The plan is shown first and must be confirmed before anything is moved.
+
+Examples:
+
+```text
+/ask organize txt files in scratch to archive
+/ask move all md files from notes to archive/notes
+/ask 把 scratch 里的 txt 文件整理到 archive
+```
+
+For example, if `scratch` contains `a.txt` and `b.txt`, OscAgent creates one
+pending action with two `move_file` operations. It still uses the workspace
+sandbox, does not delete files, and caps each plan at 20 operations.
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).

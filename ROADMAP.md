@@ -58,9 +58,12 @@
 
 ## Phase 6: Planner Agent Loop
 
-- Add a bounded multi-step planner that can choose from registered tools.
-- Enforce maximum step counts and trace logging.
-- Route risky actions into pending confirmation instead of executing immediately.
+- Add a bounded file-organization planner that turns one request into multiple
+  registered tool operations.
+- Enforce maximum operation counts.
+- Route planned write/move actions into pending confirmation instead of executing
+  immediately.
+- Keep future planner expansion traceable and scoped.
 
 ## Phase 7: Safe Shell and Git Tools
 

@@ -15,6 +15,7 @@ data/
 logs/
 scratch/
 phase6_test/
+.phase7_failure_gate
 dist/
 build/
 
